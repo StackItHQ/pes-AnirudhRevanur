@@ -60,3 +60,13 @@ All the best ✨.
 
 ## Developer's Section
 *Add your video here, and your approach to the problem (optional). Leave some comments for us here if you want, we will be reading this :)*
+
+In order to solve this problem, I've decided to go about using Triggers, ExpressJS and Google AppScript.
+- With the help of these tools, we can create a real-time sync between Google Sheets and a SQL database of our choice
+- I have used MariaDB and I have self hosted it with the help of an ExpressJS server, and open it to AppScript with the help of `localtunnel`
+- By using `localtunnel`, we can expose a localhost to the public internet
+- This allows us to access our local MariaDB server through Google AppScript
+- In the AppScript, we have triggers that activate every time there is a change in any cell, then that creates a `POST` request on the API endpoint that we have
+- So every time there is a change on Google Sheets, the local database server gets updated
+- We also have triggers on MariaDB which allow us to push data into Google Sheets
+- We can't push to anything external in MariaDB, so we will be using Express to see if there are any changes to the DB, and if there are any, we'll create a request to Google Appscript to pull from Maria
