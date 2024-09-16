@@ -1,6 +1,6 @@
 const SHEET_NAME = 'Sheet1';
 const LOG_SHEET_NAME = 'Log';
-const API_ENDPOINT = 'https://wet-suits-rule.loca.lt';
+const API_ENDPOINT = 'https://all-foxes-stop.loca.lt'; // Update with your API endpoint
 
 function onOpen() {
   SpreadsheetApp.getUi()
@@ -39,15 +39,7 @@ function pollForChanges() {
     
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
     
-    changes.forEach(change => {
-      if (change.action === 'insert') {
-        insertSheetRow(sheet, change.data);
-      } else if (change.action === 'update') {
-        updateSheetRow(sheet, change.data);
-      } else if (change.action === 'delete') {
-        deleteSheetRow(sheet, change.data.ID);
-      }
-    });
+    processChanges(changes, sheet);
     
   } catch (error) {
     Logger.log('Error polling for changes:', error);
@@ -83,74 +75,143 @@ function findRowById(sheet, id) {
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] == id) {
-      return i + 1;
+      return i + 1; // Return the 1-based row index
     }
   }
-  return null;
+  return null; // Return null if not found
+}
+
+function processChanges(changes, sheet) {
+  changes.forEach(change => {
+    const response = sendHttpRequest({
+      action: change.action,
+      data: change.data,
+      changeId: change.changeId
+    });
+
+    if (response.alreadyProcessed) {
+      // If the change was already processed, we don't need to apply it to the sheet
+      return;
+    }
+
+    if (response.synced) {
+      if (change.action === 'insert') {
+        insertSheetRow(sheet, change.data);
+      } else if (change.action === 'update') {
+        updateSheetRow(sheet, change.data);
+      } else if (change.action === 'delete') {
+        deleteSheetRow(sheet, change.data.ID);
+      }
+    } else {
+      console.log(`Change not synced: ${JSON.stringify(change)}`);
+    }
+  });
+}
+
+function sendHttpRequest(payload) {
+  const url = `${API_ENDPOINT}/api`;
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(payload)
+  };
+  
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = JSON.parse(response.getContentText());
+    
+    if (responseCode === 200) {
+      console.log(`Request successful: ${JSON.stringify(responseBody)}`);
+      return responseBody;
+    } else {
+      console.error(`Request failed with code ${responseCode}: ${responseBody}`);
+      return { synced: false, alreadyProcessed: false };
+    }
+  } catch (error) {
+    console.error(`Error sending request: ${error}`);
+    return { synced: false, alreadyProcessed: false };
+  }
 }
 
 function onChange(e) {
-  const sheet = e.source.getSheetByName(SHEET_NAME);
+  const sheet = e.source.getActiveSheet();
   const logSheet = e.source.getSheetByName(LOG_SHEET_NAME);
 
-  Logger.log('Change event: ' + JSON.stringify(e));
-
-  if (!sheet || !logSheet) {
-    Logger.log('Sheet or logSheet not found');
+  // Ensure we're working with the correct sheet
+  if (sheet.getName() !== SHEET_NAME || !logSheet) {
+    console.log('Wrong sheet or logSheet not found');
     return;
   }
 
   const range = e.range;
-  const changeType = e.changeType || 'UNKNOWN';
-  
-  Logger.log('Change Type: ' + changeType);
-  
-  if (changeType === 'INSERT_ROW' || changeType === 'REMOVE_ROW') {
-    logSheet.appendRow([new Date(), changeType, range.getRow(), '']);
-  } else if (changeType === 'EDIT') {
-    const row = range.getRow();
+  const row = range.getRow();
+  const numColumns = range.getNumColumns();
+
+  // Check if entire row was affected
+  if (numColumns === sheet.getLastColumn()) {
+    if (e.changeType === 'INSERT_ROW') {
+      onInsert(e);
+    } else if (e.changeType === 'REMOVE_ROW') {
+      onDelete(e, row);
+    }
+  } else {
+    // Assume it's an edit if not a full row insert/delete
     const id = sheet.getRange(row, 1).getValue();
     const name = sheet.getRange(row, 2).getValue();
     const role = sheet.getRange(row, 3).getValue();
     
-    logSheet.appendRow([new Date(), 'UPDATE', row, JSON.stringify({ ID: id, Name: name, Role: role })]);
-  }
-  
-  processLogs();
-}
-
-function processLogs() {
-  const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
-  const data = logSheet.getDataRange().getValues();
-  
-  for (let i = 1; i < data.length; i++) {
-    const [timestamp, action, rowNum, details] = data[i];
-    if (action === 'UPDATE') {
-      const data = JSON.parse(details);
-      sendHttpRequest({ action: 'update', data });
-    } else if (action === 'INSERT_ROW') {
-      // Handle new rows if needed
-    } else if (action === 'REMOVE_ROW') {
-      // Handle row deletions if needed
-    }
+    const data = { ID: id, Name: name, Role: role };
+    const response = sendHttpRequest({ action: 'update', data });
     
-    logSheet.deleteRow(i + 1);
-    i--;
+    if (!response.synced) {
+      console.log(`Failed to sync update for row ${row}`);
+    }
   }
 }
 
-function sendHttpRequest(data) {
-  const options = {
-    method: 'POST',
-    contentType: 'application/json',
-    payload: JSON.stringify(data)
-  };
+function onInsert(e) {
+  const sheet = e.source.getActiveSheet();
+
+  // Get the actual row number from the event object
+  const row = e.range.getRow();
+
+  console.log(`Inserting row at position: ${row}`);
+
+  // Wait for a short time to ensure the new row data is available
+  Utilities.sleep(1000);
+
+  const id = sheet.getRange(row, 1).getValue();
+  const name = sheet.getRange(row, 2).getValue();
+  const role = sheet.getRange(row, 3).getValue();
   
-  try {
-    const response = UrlFetchApp.fetch(`${API_ENDPOINT}/api`, options);
-    Logger.log('HTTP response: ' + response.getContentText());
-  } catch (error) {
-    Logger.log('Error sending HTTP request: ' + error.toString());
+  const data = {
+    ID: id,
+    Name: name,
+    Role: role
+  };
+
+  console.log(`Inserted row data: ${JSON.stringify(data)}`);
+  const response = sendHttpRequest({ action: 'insert', data });
+  
+  if (!response.synced) {
+    console.log(`Failed to sync insert for row ${row}`);
+  }
+}
+
+function onDelete(e, deletedRow) {
+  console.log(`Deleting row at position: ${deletedRow}`);
+
+  // Get the ID of the deleted row from the previous state
+  const id = e.oldValue[0][0];  // Assuming ID is in the first column
+
+  if (id) {
+    const response = sendHttpRequest({ action: 'delete', data: { ID: id } });
+    if (!response.synced) {
+      console.log(`Failed to sync delete for row ${deletedRow}`);
+    }
+  } else {
+    console.log('Unable to determine ID of deleted row');
   }
 }
 
@@ -175,20 +236,3 @@ function fullSync() {
     Logger.log('Error during full sync: ' + error.toString());
   }
 }
-
-function createHourlySync() {
-  ScriptApp.newTrigger('fullSync')
-    .timeBased()
-    .everyHours(1)
-    .create();
-}
-
-function setupTriggers() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet();
-  ScriptApp.newTrigger('onChange')
-    .forSpreadsheet(sheet)
-    .onChange()
-    .create();
-}
-
-

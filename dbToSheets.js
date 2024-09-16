@@ -18,10 +18,10 @@ let db;
 
 async function connectDB() {
   db = await mysql.createConnection({
-    host: process.env.HOST,
-    user: process.env.USERNAME,
-    password: process.env.USERPASSWORD,
-    database: process.env.DBNAME
+    host: process.env.MARIADB_HOST,
+    user: process.env.MARIADB_USER,
+    password: process.env.MARIADB_PASSWORD,
+    database: process.env.MARIADB_DATABASE
   });
   console.log("Connected to database");
 }
