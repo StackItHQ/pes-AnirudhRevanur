@@ -1,3 +1,4 @@
+[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/AHFn7Vbn)
 # Superjoin Hiring Assignment
 
 ### Welcome to Superjoin's hiring assignment! 🚀
@@ -44,9 +45,9 @@ Once you're done, make sure you **record a video** showing your project working.
 
 We have a checklist at the bottom of this README file, which you should update as your progress with your assignment. It will help us evaluate your project.
 
-- [ ] My code's working just fine! 🥳
-- [ ] I have recorded a video showing it working and embedded it in the README ▶️
-- [ ] I have tested all the normal working cases 😎
+- [ x] My code's working just fine! 🥳
+- [ x] I have recorded a video showing it working and embedded it in the README ▶️
+- [ x] I have tested all the normal working cases 😎
 - [ ] I have even solved some edge cases (brownie points) 💪
 - [ ] I added my very planned-out approach to the problem at the end of this README 📜
 
@@ -59,3 +60,22 @@ All the best ✨.
 
 ## Developer's Section
 *Add your video here, and your approach to the problem (optional). Leave some comments for us here if you want, we will be reading this :)*
+
+In order to solve this problem, I've decided to go about using Triggers, ExpressJS and Google AppScript.
+- With the help of these tools, we can create a real-time sync between Google Sheets and a SQL database of our choice
+- I have used MariaDB and I have self hosted it with the help of an ExpressJS server, and open it to AppScript with the help of `localtunnel`
+- By using `localtunnel`, we can expose a localhost to the public internet
+- This allows us to access our local MariaDB server through Google AppScript
+- In the AppScript, we have triggers that activate every time there is a change in any cell, then that creates a `POST` request on the API endpoint that we have
+- So every time there is a change on Google Sheets, the local database server gets updated
+- We also have triggers on MariaDB which allow us to push data into Google Sheets
+- We can't push to anything external in MariaDB, so we will be using Express to see if there are any changes to the DB, and if there are any, we'll create a request to Google Appscript to pull from Maria
+
+
+
+https://github.com/user-attachments/assets/2a9b8ba2-19c4-414c-9bfa-667430e6781e
+
+
+
+
+
